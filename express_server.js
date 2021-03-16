@@ -1,9 +1,22 @@
 const express = require("express");
+
 const app = express();
 const PORT = 8080; // default port 8080
 
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
+
+// Utility Functions
+const generateRandomString = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz1234567890';
+  let encodedString = '';
+  for (let i = 0; encodedString.length <= 5; i++) {
+    const randomNum = Math.floor(Math.random() * (36 - 0) + 0);
+    encodedString += chars[randomNum];
+  }
+  return encodedString;
+};
+
 
 app.post("/urls", (req, res) => {
   console.log(req.body);  // Log the POST request body to the console
@@ -49,7 +62,12 @@ app.get("/u/:shortURL", (req, res) => {
   const longUrl = urlDatabase[req.params.shortURL];
   res.redirect(longUrl);
 });
-
+//delete
+app.post("/urls/:shortURL/delete", (req, res) => {
+  console.log("delete");
+  delete urlDatabase[req.params.shortURL];
+  res.redirect("/urls")
+})
 
 
 app.get("/hello", (req, res) => {
