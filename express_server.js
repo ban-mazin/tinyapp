@@ -11,22 +11,90 @@ app.use(bodyParser.urlencoded({extended: true}));
 var cookieParser = require('cookie-parser')
 app.use(cookieParser())
 
+//set engine
+app.set("view engine", "ejs");
+
 //login
+/*app.post("/login", (req, res) => {
+  const username = { users };
+  res.cookie("user_id", users)
+  res.redirect("/urls")
+});
+*/
 app.post("/login", (req, res) => {
-  const username = "ban";
-  res.cookie("username", username)
-  res.send("ok")
+  const newUser = { 
+    id: generateRandomString(),
+    email: req.body.Email,
+    password: req.body.password
+  };
+  if (newUser.email === "" || newUser.password === "") {
+   res.status(403);
+   res.send('Invalid Passwor');
+ } else if (emailLookup(newUser.email, users)) {
+    res.status(403);
+    res.send('invalid email please register');
+   }
+  users[newUser.id] = newUser;
+  console.log(users);
+  res.cookie("user_id", newUser.id);
+   res.redirect("/urls");
+ });
+
+
+app.get("/login", (req, res) => {
+  const templateVars = {
+    user: users[req.cookies.user_id],
+  };
+  res.render("login", templateVars);
 })
+
 
 //logout
 app.post("/logout", (req, res) => {
-  res.clearCookie("username");
+  res.clearCookie("user_id");
   res.redirect('/urls');
-  res.send("ok")
 })
 
+//register
+app.get("/register", (req, res) => {
+  const templateVars = {
+    user: users[req.cookies.user_id],
+  };
+  res.render("register", templateVars);
+})
 
+const users = { 
+  "user1ID": {
+    id: "userID", 
+    email: "user@example.com", 
+    password: "purple-monkey"
+  },
+ "user2ID": {
+    id: "user2ID", 
+    email: "user2@example.com", 
+    password: "dis-funk"
+  }
+}
 
+//register
+app.post("/register", (req, res) => {
+ const newUser = { 
+   id: generateRandomString(),
+   email: req.body.Email,
+   password: req.body.password
+ };
+ if (newUser.email === "" || newUser.password === "") {
+  res.status(400);
+  res.send('Invalid Email or password');
+} else if (emailLookup(newUser.email, users)) {
+   res.status(400);
+   res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
+  }
+ users[newUser.id] = newUser;
+ console.log(users);
+ res.cookie("user_id", newUser.id);
+  res.redirect("/urls");
+});
 
 // Utility Functions
 const generateRandomString = () => {
@@ -39,6 +107,15 @@ const generateRandomString = () => {
   return encodedString;
 };
 
+function emailLookup(email, database) {
+  for (let user in database) {
+    if (database[user].email === email) {
+      return user;
+    }
+  }
+  return email;
+}
+
 
 app.post("/urls", (req, res) => {
   console.log(req.body);  // Log the POST request body to the console
@@ -46,7 +123,7 @@ app.post("/urls", (req, res) => {
 });
 
 
-app.set("view engine", "ejs");
+
 
 
 const urlDatabase = {
@@ -66,13 +143,17 @@ app.get("/urls.json", (req, res) => {
 app.get("/urls", (req, res) => {
   const templateVars = { 
     urls: urlDatabase,
-    username: req.cookies.username
+    user: users[req.cookies.user_id],
   };
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
-  res.render("urls_new");
+  const templateVars = { 
+    urls: urlDatabase,
+    user: users[req.cookies.user_id],
+  };
+  res.render("urls_new", templateVars);
 });
 
 app.get("/urls/:shortURL", (req, res) => {
