@@ -1,4 +1,6 @@
 const express = require("express");
+const bcrypt = require('bcrypt');
+
 
 const app = express();
 const PORT = 8080; // default port 8080
@@ -14,30 +16,53 @@ app.use(cookieParser())
 //set engine
 app.set("view engine", "ejs");
 
-//login
-/*app.post("/login", (req, res) => {
-  const username = { users };
-  res.cookie("user_id", users)
-  res.redirect("/urls")
-});
-*/
+const users = { 
+  "user1ID": {
+    id: "userID", 
+    email: "user@example.com", 
+    password: "purple-monkey"
+  },
+ "user2ID": {
+    id: "user2ID", 
+    email: "user2@example.com", 
+    password: "dis-funk"
+  }
+}
+
+const urlDatabase = {
+  b6UTxQ: { longURL: "https://www.tsn.ca", userID: "aJ48lW" },
+  i3BoGr: { longURL: "https://www.google.ca", userID: "aJ48lW" }
+};
+
+
 app.post("/login", (req, res) => {
+  // Login update: 
+  // Instead of creating a randomString everytime
+  // Find the user with the email, password
+  // use emailLookup
+  // if the user is there, then get the id of that user from the object.
+  // set it as the cookie 
+
   const newUser = { 
-    id: generateRandomString(),
-    email: req.body.Email,
+    id: generateRandomString(), // get the id from emailLookup(email, password) -> result.id
+    email: req.body.email,
     password: req.body.password
   };
-  if (newUser.email === "" || newUser.password === "") {
-   res.status(403);
-   res.send('Invalid Passwor');
- } else if (emailLookup(newUser.email, users)) {
-    res.status(403);
-    res.send('invalid email please register');
-   }
-  users[newUser.id] = newUser;
-  console.log(users);
-  res.cookie("user_id", newUser.id);
-   res.redirect("/urls");
+  for (let key in users) {
+    if (newUser.email == users[key].email) { //check date type and use ===
+      if (bcrypt.compareSync(newUser.password, users[key].password)) {
+        users[newUser.id] = newUser;
+       // console.log(users);
+        res.cookie("user_id", newUser.id);
+        res.redirect("/urls");
+       return;
+      } else {
+        res.status(403).send("your password does not match");
+        return;
+      }
+    }
+  }
+  res.status(403).send("Email is not registered");
  });
 
 
@@ -63,35 +88,27 @@ app.get("/register", (req, res) => {
   res.render("register", templateVars);
 })
 
-const users = { 
-  "user1ID": {
-    id: "userID", 
-    email: "user@example.com", 
-    password: "purple-monkey"
-  },
- "user2ID": {
-    id: "user2ID", 
-    email: "user2@example.com", 
-    password: "dis-funk"
-  }
-}
+
 
 //register
 app.post("/register", (req, res) => {
  const newUser = { 
    id: generateRandomString(),
-   email: req.body.Email,
-   password: req.body.password
+   email: req.body.email,
+   password: bcrypt.hashSync(req.body.password, 10)
  };
+ console.log('new', newUser)
  if (newUser.email === "" || newUser.password === "") {
   res.status(400);
   res.send('Invalid Email or password');
+  console.log('newUser.email', newUser.email);
+  console.log('users', users);
 } else if (emailLookup(newUser.email, users)) {
    res.status(400);
    res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
   }
  users[newUser.id] = newUser;
- console.log(users);
+ //console.log(users);
  res.cookie("user_id", newUser.id);
   res.redirect("/urls");
 });
@@ -113,23 +130,29 @@ function emailLookup(email, database) {
       return user;
     }
   }
-  return email;
 }
 
 
+
+//urls
 app.post("/urls", (req, res) => {
-  console.log(req.body);  // Log the POST request body to the console
-  res.send("Ok");         // Respond with 'Ok' (we will replace this)
+  const shortURL = generateRandomString();
+  urlDatabase[shortURL] = {
+    longURL: req.body.longURL,
+    userID: users[req.cookies.user_id].id,
+  };
+  res.redirect(`/urls/${shortURL}`);
 });
 
+app.get("/urls", (req, res) => {
+  // console.log("urlDatabase:", urlDatabase);
+  const templateVars = { 
+    urls: urlDatabase,
+    user: users[req.cookies.user_id],
+  };
+  res.render("urls_index", templateVars);
+});
 
-
-
-
-const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
-};
 
 
 app.get("/", (req, res) => {
@@ -140,32 +163,32 @@ app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
 
-app.get("/urls", (req, res) => {
-  const templateVars = { 
-    urls: urlDatabase,
-    user: users[req.cookies.user_id],
-  };
-  res.render("urls_index", templateVars);
-});
+
 
 app.get("/urls/new", (req, res) => {
   const templateVars = { 
     urls: urlDatabase,
     user: users[req.cookies.user_id],
   };
-  res.render("urls_new", templateVars);
+  if (templateVars.user) {
+    res.render("urls_new", templateVars);
+  } else {
+    res.redirect('/login');
+  }
+  
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const longUrl = urlDatabase[req.params.shortURL];
-  console.log(longUrl);
-  const templateVars = { shortURL: req.params.shortURL, longURL: longUrl};
+  const longUrl = urlDatabase[req.params.shortURL].longURL;
+  //console.log(longUrl);
+  const templateVars = { shortURL: req.params.shortURL, longURL: longUrl,  user: users[req.cookies.user_id]};
   res.render("urls_show", templateVars);
+  
 });
 
 
 app.get("/u/:shortURL", (req, res) => {
-  const longUrl = urlDatabase[req.params.shortURL];
+  const longUrl = urlDatabase[req.params.shortURL].longURL;
   res.redirect(longUrl);
 });
 //delete
@@ -175,15 +198,27 @@ app.post("/urls/:shortURL/delete", (req, res) => {
   res.redirect("/urls")
 });
 
+app.post("/urls/:shortURL/modify", (req, res) => {
+  // need to get the form URL from req.body. 
+  // req.body.URL -> longURL
+  // update the urlDatabase with the short url = longURL
+  const longURL = req.body.URL; // form itself
+  //console.log('longUrl', longURL);
+  const shortURL = req.params.shortURL;
+  // this is updating the urlDatabase with the newShort and longUrl
+urlDatabase[shortURL] = {
+  longURL: req.body.URL,
+  userID: users[req.cookies.user_id].id,
+};
+  res.redirect(`/urls/${shortURL}`);
+});
+
+
 //submit
 app.post("/urls/:id", (req, res) => {
   res.redirect("/url/")
 })
 
-
-app.get("/hello", (req, res) => {
-  res.send("<html><body>Hello <b>World</b></body></html>\n");
-});
 
 
 app.listen(PORT, () => {
