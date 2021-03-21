@@ -23,15 +23,15 @@ app.use(cookieSession({
 app.set("view engine", "ejs");
 
 const users = { 
-  "user1ID": {
-    id: "userID", 
+  "userRandomID": {
+    id: "userRandomID", 
     email: "user@example.com", 
-    password: "purple-monkey"
+    password: "purple-monkey-dinosaur"
   },
- "user2ID": {
-    id: "user2ID", 
+ "user2RandomID": {
+    id: "user2RandomID", 
     email: "user2@example.com", 
-    password: "dis-funk"
+    password: "dishwasher-funk"
   }
 }
 
