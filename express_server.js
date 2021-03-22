@@ -60,14 +60,12 @@ app.post("/login", (req, res) => {
   }
 });
 
-
 app.get("/login", (req, res) => {
   const templateVars = {
     user: users[req.session.user_id],
   };
   res.render("login", templateVars);
 })
-
 
 //logout
 app.post("/logout", (req, res) => {
@@ -89,7 +87,7 @@ app.post("/register", (req, res) => {
    email: req.body.email,
    password: bcrypt.hashSync(req.body.password, 10)
  };
- if (newUser.email === "" || newUser.password === "") {
+ if (!newUser.email || !newUser.password) {
   res.status(400);
   res.send('Invalid Email or password');
 } else if (emailLookup(newUser.email, users)) {
@@ -162,8 +160,6 @@ app.get("/urls/:shortURL", (req, res) => {
     } else {
       res.send('you dont have such URL');
     }
-  } else {
-    res.render('urls_index', defTemplateVars);
   }
 });
 
@@ -197,10 +193,33 @@ app.post("/urls/:shortURL/modify", (req, res) => {
     res.send('can\'t pereform this operation');
   }
 });
+//url id
+app.post("/urls/:id", (req, res) => {
+  if ( req.session.user_id === urlDatabase[req.params.id].userID ) {
+    urlDatabase[req.params.id].long = req.body.longURL;
+    res.redirect("/urls/");
+  } else { res.status(400).send("You can't update other users urls"); }
+});
 
+app.get("/urls/:id", (req, res) => {
+  let template = {
+    shortURL: req.params.id,
+    longURL: urlDatabase[req.params.id].longURL
+  };
+  res.render("urls_show", template);
+});
 
+app.get("/u/:shortURL", (req, res) => {
+  const longUrl = urlDatabase[req.params.shortURL].longURL;
+  res.redirect(longUrl);
+});
 
-
+app.get("/", (req, res) => {
+  res.render("urls_new");
+});
+app.get("/urls.json", (req, res) => {
+  res.json(urlDatabase);
+});
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
