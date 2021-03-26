@@ -23,21 +23,24 @@ app.use(cookieSession({
 app.set("view engine", "ejs");
 
 const users = { 
-  "userRandomID": {
-    id: "userRandomID", 
+  "user1ID": {
+    id: "userID", 
     email: "user@example.com", 
-    password: "purple-monkey-dinosaur"
+    password: "purple-monkey"
   },
- "user2RandomID": {
-    id: "user2RandomID", 
+ "user2ID": {
+    id: "user2ID", 
     email: "user2@example.com", 
-    password: "dishwasher-funk"
+    password: "dis-funk"
   }
 }
 
 const urlDatabase = {
   b6UTxQ: { longURL: "https://www.tsn.ca", userID: "aJ48lW" },
   i3BoGr: { longURL: "https://www.google.ca", userID: "aJ48lW" }
+};
+const defTemplateVars = {
+  user : null,
 };
 
 //login
@@ -60,13 +63,13 @@ app.post("/login", (req, res) => {
   }
 });
 
-
 app.get("/login", (req, res) => {
-  const templateVars = {
-    user: users[req.session.user_id],
-  };
-  res.render("login", templateVars);
-})
+  if (req.session.user_id) {
+    res.redirect('/urls');
+  } else {
+    res.render("login", defTemplateVars);
+  }
+});
 
 
 //logout
@@ -84,24 +87,66 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
- const newUser = { 
-   id: generateRandomString(),
-   email: req.body.email,
-   password: bcrypt.hashSync(req.body.password, 10)
- };
- if (newUser.email === "" || newUser.password === "") {
-  res.status(400);
-  res.send('Invalid Email or password');
-} else if (emailLookup(newUser.email, users)) {
+  const newUser = { 
+    id: generateRandomString(),
+    email: req.body.email,
+    password: bcrypt.hashSync(req.body.password, 10)
+  };
+  if ((!newUser.email)|| (!newUser.password)) {
    res.status(400);
-   res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
-  }
- users[newUser.id] = newUser;
- req.session.user_id = newUser.id;
-  res.redirect("/urls");
+   res.send('Invalid Email or password');
+   return;
+  }  
+ if (emailLookup(newUser.email, users)) {
+    res.status(400);
+    res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
+    return;
+   }
+  users[newUser.id] = newUser;
+  req.session.user_id = newUser.id;
+   res.redirect("/urls");
+ });
+//urls
+app.get("/urls/new", (req, res) => {
+  const templateVars = { 
+    urls: urlDatabase,
+    user: users[req.session.user_id],
+  };
+  if (templateVars.user) {
+    res.render("urls_new", templateVars);
+  } else {
+    res.redirect('/login');
+  } 
 });
 
-//urls
+app.get("/urls/:id", (req, res) => {
+  const userID = req.session.user_id;
+  console.log("userID:", userID);
+  if (!userID) {
+    res.status(400).send("You oyur are not loged in");
+    return;
+  }
+
+  const user = users[userID];
+  if (!user) {
+    res.status(400).send("Invlid user");
+    return;
+  }
+
+  const url = urlDatabase[req.params.id];
+  if (url.userID !== userID) {
+    res.status(400).send("this url is not yours");
+    return;
+  }
+
+
+  let template = {
+    user,
+    shortURL: req.params.id,
+    longURL: urlDatabase[req.params.id].longURL
+  };
+  res.render("urls_show", template);
+});
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {
@@ -135,17 +180,7 @@ app.get("/", (req, res) => {
 });
 
 
-app.get("/urls/new", (req, res) => {
-  const templateVars = { 
-    urls: urlDatabase,
-    user: users[req.session.user_id],
-  };
-  if (templateVars.user) {
-    res.render("urls_new", templateVars);
-  } else {
-    res.redirect('/login');
-  } 
-});
+
 
 //shortUR
 app.get("/urls/:shortURL", (req, res) => {
@@ -162,8 +197,6 @@ app.get("/urls/:shortURL", (req, res) => {
     } else {
       res.send('you dont have such URL');
     }
-  } else {
-    res.render('urls_index', defTemplateVars);
   }
 });
 
@@ -178,7 +211,6 @@ app.post('/urls/:shortURL', (req, res) => {
 
 //delete
 app.post("/urls/:shortURL/delete", (req, res) => {
-  
   delete urlDatabase[req.params.shortURL];
   res.redirect("/urls")
 });
@@ -197,10 +229,37 @@ app.post("/urls/:shortURL/modify", (req, res) => {
     res.send('can\'t pereform this operation');
   }
 });
+//url id
+app.post("/urls/:id", (req, res) => {
+  const userID = req.session.user_id;
+  console.log("userID:", userID);
+  if (!userID) {
+    res.status(400).send("You oyur are not loged in");
+    return;
+  }
+
+  const user = users[userID];
+  if (!user) {
+    res.status(400).send("Invlid user");
+    return;
+  }
+
+ urlDatabase[req.params.id].long = req.body.longURL;
+ res.redirect("/urls/");
+});
 
 
+app.get("/u/:shortURL", (req, res) => {
+  const longUrl = urlDatabase[req.params.shortURL].longURL;
+  res.redirect(longUrl);
+});
 
-
+app.get("/", (req, res) => {
+  res.render("urls_new");
+});
+app.get("/urls.json", (req, res) => {
+  res.json(urlDatabase);
+});
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
