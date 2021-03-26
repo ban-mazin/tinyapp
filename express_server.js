@@ -39,6 +39,9 @@ const urlDatabase = {
   b6UTxQ: { longURL: "https://www.tsn.ca", userID: "aJ48lW" },
   i3BoGr: { longURL: "https://www.google.ca", userID: "aJ48lW" }
 };
+const defTemplateVars = {
+  user : null,
+};
 
 //login
 app.post("/login", (req, res) => {
@@ -61,11 +64,12 @@ app.post("/login", (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  const templateVars = {
-    user: users[req.session.user_id],
-  };
-  res.render("login", templateVars);
-})
+  if (req.session.user_id) {
+    res.redirect('/urls');
+  } else {
+    res.render("login", defTemplateVars);
+  }
+});
 
 //logout
 app.post("/logout", (req, res) => {
@@ -82,24 +86,66 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
- const newUser = { 
-   id: generateRandomString(),
-   email: req.body.email,
-   password: bcrypt.hashSync(req.body.password, 10)
- };
- if (!newUser.email || !newUser.password) {
-  res.status(400);
-  res.send('Invalid Email or password');
-} else if (emailLookup(newUser.email, users)) {
+  const newUser = { 
+    id: generateRandomString(),
+    email: req.body.email,
+    password: bcrypt.hashSync(req.body.password, 10)
+  };
+  if ((!newUser.email)|| (!newUser.password)) {
    res.status(400);
-   res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
-  }
- users[newUser.id] = newUser;
- req.session.user_id = newUser.id;
-  res.redirect("/urls");
+   res.send('Invalid Email or password');
+   return;
+  }  
+ if (emailLookup(newUser.email, users)) {
+    res.status(400);
+    res.send('Email already exists please remember your password or try forget my password featurer that are not exist yet');
+    return;
+   }
+  users[newUser.id] = newUser;
+  req.session.user_id = newUser.id;
+   res.redirect("/urls");
+ });
+//urls
+app.get("/urls/new", (req, res) => {
+  const templateVars = { 
+    urls: urlDatabase,
+    user: users[req.session.user_id],
+  };
+  if (templateVars.user) {
+    res.render("urls_new", templateVars);
+  } else {
+    res.redirect('/login');
+  } 
 });
 
-//urls
+app.get("/urls/:id", (req, res) => {
+  const userID = req.session.user_id;
+  console.log("userID:", userID);
+  if (!userID) {
+    res.status(400).send("You oyur are not loged in");
+    return;
+  }
+
+  const user = users[userID];
+  if (!user) {
+    res.status(400).send("Invlid user");
+    return;
+  }
+
+  const url = urlDatabase[req.params.id];
+  if (url.userID !== userID) {
+    res.status(400).send("this url is not yours");
+    return;
+  }
+
+
+  let template = {
+    user,
+    shortURL: req.params.id,
+    longURL: urlDatabase[req.params.id].longURL
+  };
+  res.render("urls_show", template);
+});
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {
@@ -133,17 +179,7 @@ app.get("/", (req, res) => {
 });
 
 
-app.get("/urls/new", (req, res) => {
-  const templateVars = { 
-    urls: urlDatabase,
-    user: users[req.session.user_id],
-  };
-  if (templateVars.user) {
-    res.render("urls_new", templateVars);
-  } else {
-    res.redirect('/login');
-  } 
-});
+
 
 //shortUR
 app.get("/urls/:shortURL", (req, res) => {
@@ -194,19 +230,23 @@ app.post("/urls/:shortURL/modify", (req, res) => {
 });
 //url id
 app.post("/urls/:id", (req, res) => {
-  if ( req.session.user_id === urlDatabase[req.params.id].userID ) {
-    urlDatabase[req.params.id].long = req.body.longURL;
-    res.redirect("/urls/");
-  } else { res.status(400).send("You can't update other users urls"); }
+  const userID = req.session.user_id;
+  console.log("userID:", userID);
+  if (!userID) {
+    res.status(400).send("You oyur are not loged in");
+    return;
+  }
+
+  const user = users[userID];
+  if (!user) {
+    res.status(400).send("Invlid user");
+    return;
+  }
+
+ urlDatabase[req.params.id].long = req.body.longURL;
+ res.redirect("/urls/");
 });
 
-app.get("/urls/:id", (req, res) => {
-  let template = {
-    shortURL: req.params.id,
-    longURL: urlDatabase[req.params.id].longURL
-  };
-  res.render("urls_show", template);
-});
 
 app.get("/u/:shortURL", (req, res) => {
   const longUrl = urlDatabase[req.params.shortURL].longURL;
